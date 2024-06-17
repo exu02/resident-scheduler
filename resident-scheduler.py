@@ -1,6 +1,7 @@
 import streamlit as st
 import datetime
 import calendar
+import pulp
 from backend_helpers import *
 
 today = datetime.date.today()
@@ -8,30 +9,55 @@ month_names = calendar.month_name[1:]
 month_idx = range(1, 13)
 month_dict = dict(zip(month_names, month_idx))
 
-
-
 st.title("PGY-1 Scheduler")
 st.write("Let's get started with some inputs: ")
 
 with st.form("inputs"):
+    with st.expander(":material/Settings: Advanced Options"):
+        n_res_weekday = st.number_input("The minimum number of residents on during a regular weekday", value=2)
+        n_res_weekend = st.number_input("The minimum number of residents on during a regular weekend", value=1)
+        # n_res_call = st.number_input("The minimum number of residents on during a call shift", value=1)
+        days_off_ratio = 1 / st.number_input("On average, a resident should have a day off every ____ days", value=7)
+
     sched_year = st.selectbox("Year", range(today.year, today.year+2))
     sched_month = month_dict[st.selectbox("Month", calendar.month_name[1:], index=today.month-1)]
+    days = list(range(1, calendar.monthrange(sched_year, sched_month)[1]+1))
 
-    residents = [text.strip() for text in str(st.text_input("Residents to Schedule (comma-delimited): ", key="residents")).split(',')]
+    residents = [text.strip() for text in str(st.text_input("Residents to Schedule (comma-delimited): ", key="residents")).split(",")]
     if residents != [""]:
-        call_days = [st.multiselect(f'Call dates for {res}', options=range(1, calendar.monthrange(sched_year, sched_month)[1]+1)) for res in residents]
-        for i in range(len(call_days)):
-            for j in range(i+1, len(call_days)):
-                if listIntersect(call_days[i], call_days[j]):
-                    st.warning("multiple residents share a call date - please ensure there are no repeated call dates between residents. otherwise, a value will be overwritten and potentially unintended behavior may occur")
-        call_days_dict = swapExpandCallDaysDict(dict(zip(residents, call_days)))
-
-    with st.expander("Advanced Options"):
-        days_off_ratio = st.number_input("On average, a resident should have a day off every ____ days", value=7)
-        days_btw_call = st.number_input("Minimum number of days between call shifts", value=4)
+        call_days_list = [st.multiselect(f"Call dates for {res}", options=days) for res in residents]
+        hasIntersect = warnOverlapCallDays(call_days_list)
+        if hasIntersect:
+            st.warning("Multiple residents share a call date. Please check to see if the selected dates are correct.")
+        call_days_by_res = dict(zip(residents, call_days_list))
+        call_days_by_day = swapExpandCallDaysDict(call_days_by_res)
 
     submitted = st.form_submit_button(label="Create Schedule")
 
 if submitted:
-    st.write('yeet')
+    work, status = createSchedule(
+        month=sched_month, 
+        year=sched_year, 
+        days=days, 
+        residents=residents,
+        call_days_by_day=call_days_by_day,
+        call_days_by_res=call_days_by_res,
+        days_off_ratio=days_off_ratio,
+    )
+
+    if status.lower() == "optimal":
+        for day in days:
+            day_name = calendar.day_name[datetime.date(sched_year, sched_month, day).weekday()]
+            for resident in residents:
+                off = True
+                if work[resident, day, "day"].varValue:
+                    off = False
+                    st.write(f"{day_name} July {day}, {sched_year}: {resident} on days")
+                if work[resident, day, "call"].varValue:
+                    off = False
+                    st.write(f"{day_name} July {day}, {sched_year}: {resident} on call")
+                if off:
+                    st.write(f"{day_name} July {day}, {sched_year}: {resident} off")
+    else:
+        st.write(status, "Error Generating Schedule")
     
