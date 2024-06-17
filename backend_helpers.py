@@ -22,15 +22,6 @@ def warnOverlapCallDays(call_days_list: list):
                 if listIntersect(call_days_list[i], call_days_list[j]):
                     hasIntersect = True
                     return hasIntersect
-                
-def warnCallDatesTooSoon(call_days_by_res: list, days_btw_call: int):
-    callTooSoon = False
-    for res in call_days_by_res:
-        for i in range(len(call_days_by_res[res])):
-            for j in range(i+1, len(call_days_by_res[res])):
-                if call_days_by_res[res][j] - call_days_by_res[res][i] < days_btw_call:
-                    callTooSoon = True
-                    return callTooSoon
 
 def createSchedule(
         month: int, 
@@ -42,10 +33,8 @@ def createSchedule(
         days_off_ratio: float, 
 ):
     ## Initializing static parameters
-    weekend_ix = [day for day in days if datetime.date(year, month, day).weekday() in [5, 6]]
     shifts = {'day', 'call'}
-    days_off = math.floor(len(days) * days_off_ratio) #+ (len(call_days_by_day) // len(residents))
-
+    days_off = math.floor(len(days) * days_off_ratio)
     shift_idx = [(resident, day, shift) for resident in residents for day in days for shift in shifts]
     work = pulp.LpVariable.dicts('work', shift_idx, cat=pulp.LpBinary)
     prob = pulp.LpProblem('shift', pulp.LpMaximize)
@@ -54,12 +43,9 @@ def createSchedule(
     prob += sum(work[idx] for idx in shift_idx)
 
     ## Constraints
-    # At least 2 residents during the day
+    # At least 2 residents during the day (including on call resident)
     for day in days:
-        if day in weekend_ix:
-            prob += sum(work[resident, day, 'day'] for resident in residents) == 1
-        else:
-            prob += sum(work[resident, day, 'day'] for resident in residents) >= 2
+        prob += sum(work[resident, day, 'day'] for resident in residents) >= 2 - sum(work[resident, day, 'call'] for resident in residents)
         # if it's not an assigned call day, don't assign a call shift
         if day not in call_days_by_day:
             prob += sum(work[resident, day, 'call'] for resident in residents) == 0

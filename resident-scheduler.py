@@ -13,7 +13,7 @@ st.title("PGY-1 Scheduler")
 st.write("Let's get started with some inputs: ")
 
 with st.form("inputs"):
-    with st.expander(":material/Settings: Advanced Options"):
+    with st.expander("Advanced Options"):
         n_res_weekday = st.number_input("The minimum number of residents on during a regular weekday", value=2)
         n_res_weekend = st.number_input("The minimum number of residents on during a regular weekend", value=1)
         # n_res_call = st.number_input("The minimum number of residents on during a call shift", value=1)
