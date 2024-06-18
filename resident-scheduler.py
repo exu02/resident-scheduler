@@ -66,11 +66,11 @@ if call_days_exist:
         elif st.session_state["view_method"] == "Spreadsheet":
             st.write("Full Schedule")
             calendar_df = convertCalendarToDf(calendar_events=calendar_events)
-            st.dataframe(calendar_df)
+            st.dataframe(calendar_df, hide_index=True)
 
             for res, cal_df in calendar_df.groupby("Resident"):
                 st.write(f"{res}'s Schedule:")
-                st.dataframe(cal_df.drop("Resident", axis=1))
+                st.dataframe(cal_df.drop("Resident", axis=1), hide_index=True)
     else:
         st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try looking in the advanced options to see if lowering the minimum resident requirements can help.")
     
