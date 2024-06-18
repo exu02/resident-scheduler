@@ -30,7 +30,9 @@ def createSchedule(
         residents: list[str], 
         call_days_by_day: dict, 
         call_days_by_res: dict,
-        days_off_ratio: float, 
+        n_res_day: int,
+        n_res_call: int,
+        days_off_ratio: float,
 ):
     ## Initializing static parameters
     shifts = {'day', 'call'}
@@ -45,12 +47,12 @@ def createSchedule(
     ## Constraints
     # At least 2 residents during the day (including on call resident)
     for day in days:
-        prob += sum(work[resident, day, 'day'] for resident in residents) >= 2 - sum(work[resident, day, 'call'] for resident in residents)
+        prob += sum(work[resident, day, 'day'] for resident in residents) >= n_res_day - sum(work[resident, day, 'call'] for resident in residents)
         # if it's not an assigned call day, don't assign a call shift
         if day not in call_days_by_day:
             prob += sum(work[resident, day, 'call'] for resident in residents) == 0
         else:
-            prob += work[call_days_by_day[day], day, 'call'] == 1
+            prob += work[call_days_by_day[day], day, 'call'] == n_res_call
 
     # Only one resident assigned during call shift
     # for day in call_days_by_day:
