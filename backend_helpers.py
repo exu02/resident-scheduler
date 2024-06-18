@@ -3,6 +3,7 @@ from pulp import PULP_CBC_CMD
 import datetime
 import calendar
 import math
+import pandas as pd
 
 def swapExpandCallDaysDict(old_dict: dict):
     new_dict = {}
@@ -79,3 +80,88 @@ def createSchedule(
     results = prob.solve(PULP_CBC_CMD(msg=0))
     status = pulp.LpStatus[results]
     return work, status
+
+def createStreamlitCalendar(year: int, month: int, days: list[int], residents: list[str], work):
+    date_fmt = "%Y-%m-%d"
+    cal_resources = [{"id": resident, "resident": "SICU Interns", "title": resident} for resident in residents]
+    calendar_options = {
+        "editable": "true",
+        "selectable": "true",
+        "headerToolbar": {
+            "left": "prev,next",
+            "center": "title",
+            "right": "resourceTimelineDay,resourceTimelineWeek,resourceTimelineMonth",
+        },
+        "initialDate": datetime.date(year=year, month=month, day=1).strftime(date_fmt),
+        "initialView": "resourceTimelineMonth",
+        "resourceGroupField": "resident",
+        "resources": cal_resources,
+    }
+
+    calendar_events = []
+    for day in days:
+        for resident in residents:
+            off = True
+            if work[resident, day, 'day'].varValue:
+                off = False
+                event = {
+                    "title": "Day",
+                    "start": datetime.date(year, month, day).strftime(date_fmt),
+                    "end": datetime.date(year, month, day).strftime(date_fmt),
+                    "allDay": "true",
+                    "resourceId": resident,
+                    "backgroundColor": "blue",
+                }
+                calendar_events.append(event)
+            if work[resident, day, 'call'].varValue:
+                off = False
+                event = {
+                    "title": "Call",
+                    "start": datetime.date(year, month, day).strftime(date_fmt),
+                    "end": datetime.date(year, month, day).strftime(date_fmt),
+                    "allDay": "true",
+                    "resourceId": resident,
+                    "backgroundColor": "orange",
+                }
+                calendar_events.append(event)
+            if off:
+                event = {
+                    "title": "Off",
+                    "start": datetime.date(year, month, day).strftime(date_fmt),
+                    "end": datetime.date(year, month, day).strftime(date_fmt),
+                    "allDay": "true",
+                    "resourceId": resident,
+                    "backgroundColor": "green",
+                }
+                calendar_events.append(event)
+
+    custom_css="""
+        .fc-event-past {
+            opacity: 0.8;
+        }
+        .fc-event-time {
+            font-style: italic;
+        }
+        .fc-event-title {
+            font-weight: 700;
+        }
+        .fc-toolbar-title {
+            font-size: 2rem;
+        }
+    """
+    return calendar_options, calendar_events, custom_css
+
+def convertCalendarToDf(calendar_events: dict):
+    full_calendar_df = pd.DataFrame(calendar_events)
+    full_calendar_df = full_calendar_df.rename(
+        columns={
+            "title": "Subject",
+            "start": "Start Date",
+            "end": "End Date",
+            "allDay": "All Day Event",
+            "resourceId": "Resident",
+        }
+    )
+    full_calendar_df = full_calendar_df.drop("backgroundColor", axis=1)
+    full_calendar_df["All Day Event"] = full_calendar_df["All Day Event"].str.upper()
+    return full_calendar_df
