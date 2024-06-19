@@ -25,8 +25,6 @@ def warnOverlapCallDays(call_days_list: list):
                     return hasIntersect
 
 def createSchedule(
-        month: int, 
-        year: int, 
         days: list[int],
         residents: list[str], 
         call_days_by_day: dict, 
@@ -34,16 +32,18 @@ def createSchedule(
         n_res_day: int,
         n_res_call: int,
         days_off_ratio: float,
+        max_consecutive: int
 ):
     ## Initializing static parameters
     shifts = {'day', 'call'}
-    days_off = math.floor(len(days) * days_off_ratio)
-    shift_idx = [(resident, day, shift) for resident in residents for day in days for shift in shifts]
-    work = pulp.LpVariable.dicts('work', shift_idx, cat=pulp.LpBinary)
+    days_off = round(len(days) * days_off_ratio)
+    shift_ix = [(resident, day, shift) for resident in residents for day in days for shift in shifts]
+    work = pulp.LpVariable.dicts('work', shift_ix, cat=pulp.LpBinary)
     prob = pulp.LpProblem('shift', pulp.LpMaximize)
 
     ## Objective
-    prob += sum(work[idx] for idx in shift_idx)
+    
+    prob += sum(work[ix] for ix in shift_ix)
 
     ## Constraints
     # At least 2 residents during the day (including on call resident)
@@ -75,6 +75,18 @@ def createSchedule(
         if day in call_days_by_day:
             for resident in residents:
                 prob += sum(work[resident, day+1, shift] for shift in shifts) <= 1 - work[resident, day, 'call']
+
+    # Maximum allowed consecutive shifts
+    for eval_day in days[:len(days) - max_consecutive]:
+        for resident in residents: 
+            prob += sum(work[resident, day, shift] 
+                for day in range(eval_day, eval_day + max_consecutive + 1)  # the block of x+1 days
+                for shift in shifts) <= max_consecutive
+
+    # For fairness, every resident will have approximately the same workload
+    for i in range(len(residents)):
+        for j in range(i+1, len(residents)):
+            prob += sum(work[residents[i], day, shift] for day in days for shift in shifts) == sum(work[residents[j], day, shift] for day in days for shift in shifts)
 
     # Attempt to solve
     results = prob.solve(PULP_CBC_CMD(msg=0))

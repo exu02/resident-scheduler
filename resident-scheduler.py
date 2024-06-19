@@ -20,8 +20,10 @@ with st.form("inputs"):
         n_res_day = st.number_input("The minimum number of residents on during a day shift (including the on call resident)", value=2)
         n_res_call = st.number_input("The minimum number of residents on during a call shift", value=1)
         days_off_ratio = 1 / st.number_input("On average, a resident should have a day off every ___ days", value=7)
+        max_consecutive = st.number_input("The maximum number of consecutive days a resident should work in the scheudle", value=5)
 
     viewMethod = st.radio("Schedule View", options=["Calendar", "Spreadsheet"], key="view_method")
+    st.write("Tip: Create the schedule in the Calendar view for initial review. Then, switch to Spreadsheet view to see CSVs that are uploadable to Google Calendar")
     sched_year = st.selectbox("Year", range(today.year, today.year+2))
     sched_month = month_dict[st.selectbox("Month", calendar.month_name[1:], index=today.month-1)]
     days = list(range(1, calendar.monthrange(sched_year, sched_month)[1]+1))
@@ -40,9 +42,8 @@ with st.form("inputs"):
     st.form_submit_button(label="Create Schedule")
 
 if call_days_exist:
+    st.write("Tip: If you'd like to see alternate schedules, try changing the maximum number of consecutive shifts in the Advanced Options")
     work, status = createSchedule(
-        month=sched_month, 
-        year=sched_year, 
         days=days, 
         residents=residents,
         call_days_by_day=call_days_by_day,
@@ -50,6 +51,7 @@ if call_days_exist:
         n_res_day=n_res_day,
         n_res_call=n_res_call,
         days_off_ratio=days_off_ratio,
+        max_consecutive=max_consecutive
     )
 
     if status.lower() == "optimal":
@@ -64,12 +66,12 @@ if call_days_exist:
             cal = st_calendar(events=calendar_events, options=calendar_options, custom_css=custom_css)
             st.write(cal)
         elif st.session_state["view_method"] == "Spreadsheet":
-            st.write("Full Schedule")
+            st.write("Full Schedule:")
             calendar_df = convertCalendarToDf(calendar_events=calendar_events)
             st.dataframe(calendar_df, hide_index=True)
 
             for res, cal_df in calendar_df.groupby("Resident"):
-                st.write(f"{res}'s Schedule:")
+                st.write(f"{res}'s Schedule (Uploadable to Google Calendar):")
                 st.dataframe(cal_df.drop("Resident", axis=1), hide_index=True)
     else:
         st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try looking in the advanced options to see if lowering the minimum resident requirements can help.")
