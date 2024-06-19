@@ -1,7 +1,6 @@
 import pulp
 from pulp import PULP_CBC_CMD
 import datetime
-import calendar
 import math
 import pandas as pd
 
@@ -30,9 +29,8 @@ def createSchedule(
         call_days_by_day: dict, 
         call_days_by_res: dict,
         n_res_day: int,
-        n_res_call: int,
         days_off_ratio: float,
-        max_consecutive: int
+        max_consecutive: int,
 ):
     ## Initializing static parameters
     shifts = {'day', 'call'}
@@ -42,7 +40,6 @@ def createSchedule(
     prob = pulp.LpProblem('shift', pulp.LpMaximize)
 
     ## Objective
-    
     prob += sum(work[ix] for ix in shift_ix)
 
     ## Constraints
@@ -53,11 +50,11 @@ def createSchedule(
         if day not in call_days_by_day:
             prob += sum(work[resident, day, 'call'] for resident in residents) == 0
         else:
-            prob += work[call_days_by_day[day], day, 'call'] == n_res_call
+            prob += work[call_days_by_day[day], day, 'call'] == 1
 
     # Only one resident assigned during call shift
-    # for day in call_days_by_day:
-    #     prob += sum(work[resident, day, 'call'] for resident in residents) == 1
+    for day in call_days_by_day:
+        prob += sum(work[resident, day, 'call'] for resident in residents) == 1
 
     # Residents can only work at most 1 shift a day
     for day in days:
@@ -72,7 +69,7 @@ def createSchedule(
 
     # Day after call shift is guaranteed off
     for day in days:
-        if day in call_days_by_day:
+        if day in call_days_by_day and day != days[-1]:
             for resident in residents:
                 prob += sum(work[resident, day+1, shift] for shift in shifts) <= 1 - work[resident, day, 'call']
 

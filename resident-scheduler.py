@@ -18,11 +18,10 @@ st.write("Let's get started with some inputs: ")
 with st.form("inputs"):
     with st.expander("Advanced Options"):
         n_res_day = st.number_input("The minimum number of residents on during a day shift (including the on call resident)", value=2)
-        n_res_call = st.number_input("The minimum number of residents on during a call shift", value=1)
         days_off_ratio = 1 / st.number_input("On average, a resident should have a day off every ___ days", value=7)
         max_consecutive = st.number_input("The maximum number of consecutive days a resident should work in the scheudle", value=5)
 
-    viewMethod = st.radio("Schedule View", options=["Calendar", "Spreadsheet"], key="view_method")
+    view_method = st.radio("Schedule View", options=["Calendar", "Spreadsheet"], key="view_method")
     st.write("Tip: Create the schedule in the Calendar view for initial review. Then, switch to Spreadsheet view to see CSVs that are uploadable to Google Calendar")
     sched_year = st.selectbox("Year", range(today.year, today.year+2))
     sched_month = month_dict[st.selectbox("Month", calendar.month_name[1:], index=today.month-1)]
@@ -49,9 +48,8 @@ if call_days_exist:
         call_days_by_day=call_days_by_day,
         call_days_by_res=call_days_by_res,
         n_res_day=n_res_day,
-        n_res_call=n_res_call,
         days_off_ratio=days_off_ratio,
-        max_consecutive=max_consecutive
+        max_consecutive=max_consecutive,
     )
 
     if status.lower() == "optimal":
@@ -74,5 +72,5 @@ if call_days_exist:
                 st.write(f"{res}'s Schedule (Uploadable to Google Calendar):")
                 st.dataframe(cal_df.drop("Resident", axis=1), hide_index=True)
     else:
-        st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try looking in the advanced options to see if lowering the minimum resident requirements can help.")
+        st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try looking in the advanced options to see if lowering the minimum resident requirements or raising the max consecutive days can help.")
     
