@@ -4,7 +4,7 @@ import datetime
 import math
 import pandas as pd
 
-def swapExpandCallDaysDict(old_dict: dict):
+def swapExpandDaysDict(old_dict: dict):
     new_dict = {}
     for key in old_dict:
         for val in old_dict[key]:
@@ -15,11 +15,11 @@ def listIntersect(list1: list, list2: list):
     intersect = [val for val in list1 if val in list2]
     return intersect
 
-def warnOverlapCallDays(call_days_list: list):
+def warnOverlapDays(days_list: list):
     hasIntersect = False
-    for i in range(len(call_days_list)):
-            for j in range(i+1, len(call_days_list)):
-                if listIntersect(call_days_list[i], call_days_list[j]):
+    for i in range(len(days_list)):
+            for j in range(i+1, len(days_list)):
+                if listIntersect(days_list[i], days_list[j]):
                     hasIntersect = True
                     return hasIntersect
 
@@ -27,7 +27,7 @@ def createSchedule(
         days: list[int],
         residents: list[str], 
         call_days_by_day: dict, 
-        call_days_by_res: dict,
+        req_off_by_day: dict,
         n_res_day: int,
         days_off_ratio: float,
         max_consecutive: int,
@@ -40,6 +40,7 @@ def createSchedule(
     work = pulp.LpVariable.dicts('work', shift_ix, cat=pulp.LpBinary)
     prob = pulp.LpProblem('shift', pulp.LpMaximize)
     post_call_days = [day + 1 for day in call_days_by_day]
+
     ## Objective
     prob += sum(work[ix] for ix in shift_ix)
 
@@ -66,24 +67,28 @@ def createSchedule(
         for resident in residents:
             prob += sum(work[resident, day, shift] for shift in shifts) <= 1
 
-    # On average, one day off per 7 days
+    # On average, one day off per n days
     for resident in residents: 
         prob += sum(work[resident, day, shift]
             for day in days
-            for shift in shifts) <= len(days) - (days_off + len(call_days_by_res[resident]))
+            for shift in shifts) <= len(days) - days_off
 
-    # Day after call shift is guaranteed off
-    for day in days:
-        if day in call_days_by_day and day != days[-1]:
+    # Day after call shift is guaranteed post-call
+    for day in call_days_by_day:
+        if day != days[-1]:
             for resident in residents:
                 prob += work[resident, day, 'call'] <= work[resident, day+1, 'post-call']
+
+    # Assign requested days off
+    for day in req_off_by_day:
+        prob += sum(work[req_off_by_day[day], day, shift] for shift in shifts) == 0
 
     # Maximum allowed consecutive shifts
     for eval_day in days[:len(days) - max_consecutive]:
         for resident in residents: 
             prob += sum(work[resident, day, shift] 
                 for day in range(eval_day, eval_day + max_consecutive + 1)
-                for shift in shifts) <= max_consecutive
+                for shift in ['day', 'call']) <= max_consecutive
             
     # No consecutive off days
     if not consecutive_off:
