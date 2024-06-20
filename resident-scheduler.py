@@ -16,38 +16,51 @@ st.title("PGY-1 SICU Scheduler")
 st.write("Let's get started with some inputs: ")
 
 with st.form("inputs"):
+    # Advanced Options
     with st.expander("Advanced Options"):
         n_res_day = st.number_input("The minimum number of residents on during a day shift (including the on call resident)", value=2)
         days_off_ratio = 1 / st.number_input("On average, a resident should have a day off every ___ days", value=7)
         max_consecutive = st.number_input("The maximum number of consecutive days a resident should work in the scheudle", value=5)
         consecutive_off = st.radio("Should consecutive off days be allowed?", options=["No", "Yes"]) == "Yes"
 
+    # Basic User Inputs
     view_method = st.radio("Schedule View", options=["Calendar", "Spreadsheet"], key="view_method")
-    st.write("Tip: Create the schedule in the Calendar view for initial review. Then, switch to Spreadsheet view to see CSVs that are uploadable to Google Calendar")
+    st.write("Tip: You can create the schedule in the Calendar view for initial review. Then, switch to Spreadsheet view to see CSVs that are uploadable to Google Calendar")
     sched_year = st.selectbox("Year", range(today.year, today.year+2))
     sched_month = month_dict[st.selectbox("Month", calendar.month_name[1:], index=today.month-1)]
     days = list(range(1, calendar.monthrange(sched_year, sched_month)[1]+1))
 
+    # Residents, call days, and requeste off days
     residents = [text.strip() for text in str(st.text_input("Residents to Schedule (comma-delimited): ", key="residents")).split(",")]
     if residents != [""]:
-        call_days_list = [st.multiselect(f"Call dates for {res}", options=days, key=f"call_dates_{res}") for res in residents]
-        hasIntersect = warnOverlapCallDays(call_days_list)
-        if hasIntersect:
+        col1, col2 = st.columns(2)
+        with col1:
+            call_days_list = [st.multiselect(f"Call dates for {res}", options=days, key=f"call_dates_{res}") for res in residents]
+        callHasIntersect = warnOverlapDays(call_days_list)
+        if callHasIntersect:
             st.warning("Multiple residents share a call date. Please check to see if the selected dates are correct.")
         call_days_by_res = dict(zip(residents, call_days_list))
-        call_days_by_day = swapExpandCallDaysDict(call_days_by_res)
-    
+        call_days_by_day = swapExpandDaysDict(call_days_by_res)
+
+        with col2:
+            req_off_list = [st.multiselect(f"{res}'s Requested Days Off", options=days, key=f"req_off_{res}") for res in residents]
+        offHasIntersect = warnOverlapDays(req_off_list)
+        if offHasIntersect:
+            st.warning("Multiple residents have requested the same day off. Please check to see if this is correct.")
+        req_off_by_res = dict(zip(residents, req_off_list))
+        req_off_by_day = swapExpandDaysDict(req_off_by_res)
+        
         call_days_exist = sum(bool(st.session_state[f"call_dates_{res}"]) for res in residents)
 
     st.form_submit_button(label="Create Schedule")
 
 if call_days_exist:
-    st.write("Tip: If you'd like to see alternate schedules, try changing the maximum number of consecutive shifts in the Advanced Options")
+    st.write("Tip: If you'd like to see alternate schedules, a simple way is to change the maximum number of consecutive shifts in the Advanced Options")
     work, status = createSchedule(
         days=days, 
         residents=residents,
         call_days_by_day=call_days_by_day,
-        call_days_by_res=call_days_by_res,
+        req_off_by_day=req_off_by_day,
         n_res_day=n_res_day,
         days_off_ratio=days_off_ratio,
         max_consecutive=max_consecutive,
@@ -74,5 +87,5 @@ if call_days_exist:
                 st.write(f"{res}'s Schedule (Uploadable to Google Calendar):")
                 st.dataframe(cal_df.drop("Resident", axis=1), hide_index=True)
     else:
-        st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try looking in the advanced options to see if lowering the minimum resident requirements or raising the max consecutive days can help.")
+        st.write(f"{status}: Could not optimize the schedule according to the given parameters. Try revisiting the requested days off, or look in the advanced options to see if lowering the minimum resident requirements or raising the max consecutive days can help.")
     
