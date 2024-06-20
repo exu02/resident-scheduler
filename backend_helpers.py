@@ -31,6 +31,7 @@ def createSchedule(
         n_res_day: int,
         days_off_ratio: float,
         max_consecutive: int,
+        consecutive_off: bool,
 ):
     ## Initializing static parameters
     shifts = {'day', 'call'}
@@ -77,8 +78,15 @@ def createSchedule(
     for eval_day in days[:len(days) - max_consecutive]:
         for resident in residents: 
             prob += sum(work[resident, day, shift] 
-                for day in range(eval_day, eval_day + max_consecutive + 1)  # the block of x+1 days
+                for day in range(eval_day, eval_day + max_consecutive + 1)
                 for shift in shifts) <= max_consecutive
+            
+    # No consecutive off days
+    if not consecutive_off:
+        for day in days[:-1]:
+            for resident in residents:
+                print()
+                prob += sum(work[resident, day, shift] for shift in shifts) + sum(work[resident, day+1, shift] for shift in shifts) >= 1
 
     # For fairness, every resident will have approximately the same workload
     for i in range(len(residents)):

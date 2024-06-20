@@ -20,6 +20,7 @@ with st.form("inputs"):
         n_res_day = st.number_input("The minimum number of residents on during a day shift (including the on call resident)", value=2)
         days_off_ratio = 1 / st.number_input("On average, a resident should have a day off every ___ days", value=7)
         max_consecutive = st.number_input("The maximum number of consecutive days a resident should work in the scheudle", value=5)
+        consecutive_off = st.radio("Should consecutive off days be allowed?", options=["No", "Yes"]) == "Yes"
 
     view_method = st.radio("Schedule View", options=["Calendar", "Spreadsheet"], key="view_method")
     st.write("Tip: Create the schedule in the Calendar view for initial review. Then, switch to Spreadsheet view to see CSVs that are uploadable to Google Calendar")
@@ -50,6 +51,7 @@ if call_days_exist:
         n_res_day=n_res_day,
         days_off_ratio=days_off_ratio,
         max_consecutive=max_consecutive,
+        consecutive_off = consecutive_off
     )
 
     if status.lower() == "optimal":
