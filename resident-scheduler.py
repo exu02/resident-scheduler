@@ -68,9 +68,9 @@ if call_days_exist:
         elif st.session_state["view_method"] == "Spreadsheet":
             st.write("Full Schedule:")
             calendar_df = convertCalendarToDf(calendar_events=calendar_events)
-            st.dataframe(calendar_df, hide_index=True)
+            edited_calendar = st.data_editor(calendar_df, hide_index=True)
 
-            for res, cal_df in calendar_df.groupby("Resident"):
+            for res, cal_df in edited_calendar.groupby("Resident"):
                 st.write(f"{res}'s Schedule (Uploadable to Google Calendar):")
                 st.dataframe(cal_df.drop("Resident", axis=1), hide_index=True)
     else:

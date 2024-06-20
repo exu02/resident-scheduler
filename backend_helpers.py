@@ -34,12 +34,12 @@ def createSchedule(
         consecutive_off: bool,
 ):
     ## Initializing static parameters
-    shifts = {'day', 'call'}
+    shifts = {'day', 'call', 'post-call'}
     days_off = round(len(days) * days_off_ratio)
     shift_ix = [(resident, day, shift) for resident in residents for day in days for shift in shifts]
     work = pulp.LpVariable.dicts('work', shift_ix, cat=pulp.LpBinary)
     prob = pulp.LpProblem('shift', pulp.LpMaximize)
-
+    post_call_days = [day + 1 for day in call_days_by_day]
     ## Objective
     prob += sum(work[ix] for ix in shift_ix)
 
@@ -52,6 +52,10 @@ def createSchedule(
             prob += sum(work[resident, day, 'call'] for resident in residents) == 0
         else:
             prob += work[call_days_by_day[day], day, 'call'] == 1
+
+    for day in days:
+        if day not in post_call_days:
+            prob += sum(work[resident, day, 'post-call'] for resident in residents) == 0
 
     # Only one resident assigned during call shift
     for day in call_days_by_day:
@@ -72,7 +76,7 @@ def createSchedule(
     for day in days:
         if day in call_days_by_day and day != days[-1]:
             for resident in residents:
-                prob += sum(work[resident, day+1, shift] for shift in shifts) <= 1 - work[resident, day, 'call']
+                prob += work[resident, day, 'call'] <= work[resident, day+1, 'post-call']
 
     # Maximum allowed consecutive shifts
     for eval_day in days[:len(days) - max_consecutive]:
@@ -122,7 +126,7 @@ def createStreamlitCalendar(year: int, month: int, days: list[int], residents: l
             if work[resident, day, 'day'].varValue:
                 off = False
                 event = {
-                    "title": "Day",
+                    "title": "SICU",
                     "start": datetime.date(year, month, day).strftime(date_fmt),
                     "end": datetime.date(year, month, day).strftime(date_fmt),
                     "allDay": "true",
@@ -133,12 +137,23 @@ def createStreamlitCalendar(year: int, month: int, days: list[int], residents: l
             if work[resident, day, 'call'].varValue:
                 off = False
                 event = {
-                    "title": "Call",
+                    "title": "HSP Call",
                     "start": datetime.date(year, month, day).strftime(date_fmt),
                     "end": datetime.date(year, month, day).strftime(date_fmt),
                     "allDay": "true",
                     "resourceId": resident,
-                    "backgroundColor": "orange",
+                    "backgroundColor": "tomato",
+                }
+                calendar_events.append(event)
+            if work[resident, day, 'post-call'].varValue:
+                off = False
+                event = {
+                    "title": "Post-call",
+                    "start": datetime.date(year, month, day).strftime(date_fmt),
+                    "end": datetime.date(year, month, day).strftime(date_fmt),
+                    "allDay": "true",
+                    "resourceId": resident,
+                    "backgroundColor": "mediumpurple",
                 }
                 calendar_events.append(event)
             if off:
@@ -148,7 +163,7 @@ def createStreamlitCalendar(year: int, month: int, days: list[int], residents: l
                     "end": datetime.date(year, month, day).strftime(date_fmt),
                     "allDay": "true",
                     "resourceId": resident,
-                    "backgroundColor": "green",
+                    "backgroundColor": "darkslategray",
                 }
                 calendar_events.append(event)
 
